@@ -2,7 +2,7 @@
   "schema_version": "1.0.0",
   "last_updated": "2026-11-22",
   "project_name": "dbt-dataops-governance-engine",
-  "current_phase_id": "phase-03",
+  "current_phase_id": "phase-04",
   "overall_status": "ON_TRACK",
   "phases": [
     {
@@ -68,8 +68,8 @@
       "label": "Fase 04",
       "name": "Scaffolder Medallion Automatizado & Contratos ODCS v3.1",
       "branch": "feat/phase-04-medallion-scaffolder",
-      "status": "PENDING",
-      "completed_at": null,
+      "status": "COMPLETED",
+      "completed_at": "2026-11-22",
       "deliverables": [
         "Geração de source.yml, stg_*.sql, dim_*/fct_*, _models.yml e contract.yaml ODCS v3.1",
         "Testes unique/not_null/accepted_values/relationships e esqueleto de dbt unit test",
@@ -158,6 +158,12 @@
       "phase": "Fase 03",
       "milestone": "Transpilação Multi-Cloud & Otimização Incremental (PR #4)",
       "summary": "Implementação do MultiCloudTranspiler (DuckDB <-> Spark SQL/Databricks <-> Snowflake + BigQuery) com preservação de Jinja dbt, detecção explícita de limitações, IncrementalOptimizer e suíte de round-trip."
+    },
+    {
+      "date": "2026-11-22",
+      "phase": "Fase 04",
+      "milestone": "Scaffolder Medallion & Contratos ODCS v3.1 (PR #5)",
+      "summary": "Implementação do MedallionScaffolder a partir de Parquet, CSV, DuckDB e DDL SQL com proteção anti-traversal, geração de sources/staging/core, contract.enforced, unit_tests dbt, ODCS v3.1 e execução real de dbt build em DuckDB."
     }
   ]
 }
