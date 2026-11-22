@@ -2,7 +2,7 @@
   "schema_version": "1.0.0",
   "last_updated": "2026-11-22",
   "project_name": "dbt-dataops-governance-engine",
-  "current_phase_id": "phase-05",
+  "current_phase_id": "phase-06",
   "overall_status": "ON_TRACK",
   "phases": [
     {
@@ -96,8 +96,8 @@
       "label": "Fase 06",
       "name": "Slim CI (state:modified+), SQLFluff & GitHub Pages",
       "branch": "ci/phase-06-slim-ci-pages",
-      "status": "PENDING",
-      "completed_at": null,
+      "status": "COMPLETED",
+      "completed_at": "2026-11-22",
       "deliverables": [
         "Workflow Slim CI com diff de manifest.json (dbt build --select state:modified+)",
         "Configuração .sqlfluff (templater jinja) no CI",
@@ -170,6 +170,12 @@
       "phase": "Fase 05",
       "milestone": "Projeto dbt de Referência & Macros Portáveis (PR #6)",
       "summary": "Construção do projeto dbt sintético (dge_reference) com 4 macros cross-warehouse (mask_lgpd_pii, generate_surrogate_key_strict, incremental_watermark_filter, audit_run_metadata), lint_dbt_docs.py (100% cobertura) e relatório exemplo versionado."
+    },
+    {
+      "date": "2026-11-22",
+      "phase": "Fase 06",
+      "milestone": "Slim CI, SQLFluff & GitHub Pages (PR #7)",
+      "summary": "Configuração de .sqlfluff (templater jinja), runner scripts/run_slim_ci.py com seleção seletiva state:modified+, workflow slim-ci.yml demonstrado em PR e workflow dbt-docs-pages.yml para publicação de linhagem no GitHub Pages."
     }
   ]
 }

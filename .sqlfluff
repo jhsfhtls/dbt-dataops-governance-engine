@@ -1,0 +1,33 @@
+[sqlfluff]
+dialect = duckdb
+templater = jinja
+max_line_length = 120
+exclude_rules = LT05,ST06,AM04
+
+[sqlfluff:indentation]
+indent_unit = space
+tab_space_size = 4
+
+[sqlfluff:rules:capitalisation.keywords]
+capitalisation_policy = upper
+
+[sqlfluff:rules:capitalisation.identifiers]
+extended_capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.functions]
+extended_capitalisation_policy = upper
+
+[sqlfluff:rules:capitalisation.types]
+extended_capitalisation_policy = upper
+
+[sqlfluff:templater:jinja]
+apply_dbt_builtins = True
+
+[sqlfluff:templater:jinja:macros]
+dbt_ref = {% macro ref(name) %}{{ name }}{% endmacro %}
+dbt_source = {% macro source(src, name) %}{{ src }}_{{ name }}{% endmacro %}
+dbt_config = {% macro config() %}{% set _ = kwargs %}{% endmacro %}
+dge_mask = {% macro mask_lgpd_pii(column_name, mode='default') %}CAST({{ column_name }} AS VARCHAR){% endmacro %}
+dge_sk = {% macro generate_surrogate_key_strict(field_list) %}SHA256(CAST({{ field_list[0] }} AS VARCHAR)){% endmacro %}
+dge_inc = {% macro incremental_watermark_filter(watermark_column, lookback_days=3) %}WHERE {{ watermark_column }} >= TIMESTAMP '1970-01-01 00:00:00'{% endmacro %}
+dge_audit = {% macro audit_run_metadata() %}CAST('id' AS VARCHAR) AS _dge_invocation_id, CAST(CURRENT_TIMESTAMP AS TIMESTAMP) AS _dge_loaded_at_utc, CAST('m' AS VARCHAR) AS _dge_model_name{% endmacro %}

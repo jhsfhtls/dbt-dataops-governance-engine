@@ -1,0 +1,61 @@
+name: Slim CI — SQLFluff & dbt state:modified+
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  slim-ci-dbt:
+    name: SQLFluff Lint & dbt Slim CI (state:modified+)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR head with full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install pinned dependencies and package
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+          pip install --no-deps -e .
+
+      - name: Run SQLFluff static SQL/Jinja lint
+        run: sqlfluff lint dbt/models
+
+      - name: Build baseline manifest.json from origin/main
+        run: |
+          git fetch origin main
+          if git cat-file -e origin/main:dbt/dbt_project.yml 2>/dev/null; then
+            git worktree add --detach /tmp/dge_baseline origin/main
+            mkdir -p /tmp/dge_baseline/dbt/target
+            DGE_DUCKDB_PATH=/tmp/dge_baseline/dbt/target/dge_reference.duckdb \
+              dbt build --project-dir /tmp/dge_baseline/dbt --profiles-dir /tmp/dge_baseline/dbt
+            DGE_DUCKDB_PATH=/tmp/dge_baseline/dbt/target/dge_reference.duckdb \
+              dbt docs generate --project-dir /tmp/dge_baseline/dbt --profiles-dir /tmp/dge_baseline/dbt
+          else
+            echo "No dbt project on origin/main yet; Slim CI will run full fallback."
+          fi
+
+      - name: Execute Slim CI (dbt build --select state:modified+)
+        run: |
+          mkdir -p dbt/target
+          if [ -f /tmp/dge_baseline/dbt/target/manifest.json ]; then
+            python scripts/run_slim_ci.py --dbt-dir dbt --state-dir /tmp/dge_baseline/dbt/target
+          else
+            python scripts/run_slim_ci.py --dbt-dir dbt
+          fi
+
+      - name: Generate dbt docs & verify 100% documentation coverage
+        run: |
+          dbt docs generate --project-dir dbt --profiles-dir dbt
+          python scripts/lint_dbt_docs.py

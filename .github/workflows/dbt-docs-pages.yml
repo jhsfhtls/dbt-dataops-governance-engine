@@ -1,0 +1,64 @@
+name: Deploy dbt Lineage Docs to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "dbt/**"
+      - ".github/workflows/dbt-docs-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    name: Build Static dbt Docs & Publish Pages
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install pinned dependencies and package
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+          pip install --no-deps -e .
+
+      - name: Build reference dbt project & static documentation
+        run: |
+          mkdir -p dbt/target site
+          dbt build --project-dir dbt --profiles-dir dbt
+          dbt docs generate --project-dir dbt --profiles-dir dbt --static
+          python scripts/lint_dbt_docs.py
+          cp dbt/target/static_index.html site/index.html
+          cp dbt/target/manifest.json site/manifest.json
+          cp dbt/target/catalog.json site/catalog.json
+          cp dbt/target/graph_summary.json site/graph_summary.json
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

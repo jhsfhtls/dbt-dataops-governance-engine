@@ -63,6 +63,9 @@ jobs:
       - name: Run Ruff static analysis
         run: ruff check .
 
+      - name: Run SQLFluff static SQL/Jinja lint
+        run: sqlfluff lint dbt/models
+
       - name: Validate rule catalog schema
         run: python scripts/validate_catalog.py
 
