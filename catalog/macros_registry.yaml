@@ -1,0 +1,55 @@
+schema_version: "1.0.0"
+updated_at: "2026-11-22"
+
+macros:
+  - macro_id: mask_lgpd_pii
+    name: mask_lgpd_pii
+    category: LGPD_PRIVACY
+    status: PLANNED
+    supported_dialects:
+      - duckdb
+      - snowflake
+      - spark
+      - bigquery
+    signature: "mask_lgpd_pii(column_name, mode='default')"
+    description: Applies deterministic LGPD-compliant masking for CPF, CNPJ, email, and phone attributes across supported SQL adapters.
+    usage_example: "{{ mask_lgpd_pii('email', mode='email') }} AS email_masked"
+
+  - macro_id: generate_surrogate_key_strict
+    name: generate_surrogate_key_strict
+    category: MODELING_INTEGRITY
+    status: PLANNED
+    supported_dialects:
+      - duckdb
+      - snowflake
+      - spark
+      - bigquery
+    signature: "generate_surrogate_key_strict(field_list)"
+    description: Generates a deterministic SHA-256 surrogate key that preserves leading zeros and differentiates NULL values from empty strings.
+    usage_example: "{{ generate_surrogate_key_strict(['order_id', 'line_number']) }} AS order_line_sk"
+
+  - macro_id: incremental_watermark_filter
+    name: incremental_watermark_filter
+    category: PERFORMANCE_FINOPS
+    status: PLANNED
+    supported_dialects:
+      - duckdb
+      - snowflake
+      - spark
+      - bigquery
+    signature: "incremental_watermark_filter(watermark_column, lookback_days=3)"
+    description: Emits a portable incremental lookback predicate guarded by is_incremental() to prevent full-table scans on large fact models.
+    usage_example: "{{ incremental_watermark_filter('updated_at', lookback_days=3) }}"
+
+  - macro_id: audit_run_metadata
+    name: audit_run_metadata
+    category: OBSERVABILITY_LINEAGE
+    status: PLANNED
+    supported_dialects:
+      - duckdb
+      - snowflake
+      - spark
+      - bigquery
+    signature: "audit_run_metadata()"
+    description: Injects standardized lineage and execution metadata columns (_dge_invocation_id, _dge_loaded_at_utc, _dge_model_name) into materialized tables.
+    usage_example: "{{ audit_run_metadata() }}"

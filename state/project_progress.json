@@ -1,0 +1,151 @@
+{
+  "schema_version": "1.0.0",
+  "last_updated": "2026-11-22",
+  "project_name": "dbt-dataops-governance-engine",
+  "current_phase_id": "phase-01",
+  "overall_status": "ON_TRACK",
+  "phases": [
+    {
+      "id": "phase-00",
+      "label": "Fase 00",
+      "name": "ADRs & Catálogo de 25 Regras de Governança",
+      "branch": "docs/phase-00-adrs-and-catalog",
+      "status": "COMPLETED",
+      "completed_at": "2026-11-22",
+      "deliverables": [
+        "ADR-001 (análise AST estática via sqlglot multi-dialeto sem execução de SQL)",
+        "ADR-002 (scaffolder Medallion, ODCS v3.1, proteção contra traversal e Client Path Shield)",
+        "catalog/governance_rules.yaml com 25 regras em 4 famílias (7/6/6/6)",
+        "scripts/validate_catalog.py (validador determinístico de schema)"
+      ],
+      "gate": "Catálogo validado por schema (25/25 regras)"
+    },
+    {
+      "id": "phase-01",
+      "label": "Fase 01",
+      "name": "Fundação do Repositório, Empacotamento, Renderizadores & CI/CD",
+      "branch": "chore/phase-01-foundation-ci",
+      "status": "COMPLETED",
+      "completed_at": "2026-11-22",
+      "deliverables": [
+        "Ambiente .venv isolado (Python 3.12) e dependências pinadas com ==",
+        "pyproject.toml, requirements.txt e requirements-dev.txt",
+        "catalog/macros_registry.yaml, render_catalog.py (CATALOG.md) e render_progress.py (JORNADA_IMPLEMENTACAO.md)",
+        "Workflows GitHub Actions (.github/workflows/ci.yml e pr-lint.yml) e README completo",
+        "Suíte de testes determinísticos em tests/test_foundation.py"
+      ],
+      "gate": "ruff, validate_catalog, render_* --check, pytest e CI 100% verdes"
+    },
+    {
+      "id": "phase-02",
+      "label": "Fase 02",
+      "name": "Motor AST de Auditoria Estática (sqlglot)",
+      "branch": "feat/phase-02-ast-audit-engine",
+      "status": "PENDING",
+      "completed_at": null,
+      "deliverables": [
+        "Pré-processador determinístico e reversível de Jinja dbt",
+        "Avaliação AST das 25 regras em SQL/YAML/ODCS",
+        "Scorecard (0-100), relatório FinOps/LGPD (MD/JSON) e Client Path Shield"
+      ],
+      "gate": ">= 1 teste positivo e >= 1 negativo por regra + falsos positivos documentados"
+    },
+    {
+      "id": "phase-03",
+      "label": "Fase 03",
+      "name": "Transpilação Multi-Cloud & Otimização Incremental",
+      "branch": "feat/phase-03-transpiler-incremental",
+      "status": "PENDING",
+      "completed_at": null,
+      "deliverables": [
+        "Transpilador DuckDB <-> Spark SQL (Databricks) <-> Snowflake",
+        "Consultor de conversão full-refresh -> incremental (merge/delete+insert, unique_key, watermark)"
+      ],
+      "gate": "Round-trip validado em corpus de teste; limitações documentadas"
+    },
+    {
+      "id": "phase-04",
+      "label": "Fase 04",
+      "name": "Scaffolder Medallion Automatizado & Contratos ODCS v3.1",
+      "branch": "feat/phase-04-medallion-scaffolder",
+      "status": "PENDING",
+      "completed_at": null,
+      "deliverables": [
+        "Geração de source.yml, stg_*.sql, dim_*/fct_*, _models.yml e contract.yaml ODCS v3.1",
+        "Testes unique/not_null/accepted_values/relationships e esqueleto de dbt unit test",
+        "Validação estrita de diretório de saída (anti-path-traversal)"
+      ],
+      "gate": "Projeto gerado compila e passa dbt build em DuckDB no CI"
+    },
+    {
+      "id": "phase-05",
+      "label": "Fase 05",
+      "name": "Projeto dbt de Referência & Macros Portáveis",
+      "branch": "feat/phase-05-reference-dbt-project",
+      "status": "PENDING",
+      "completed_at": null,
+      "deliverables": [
+        "Projeto dbt sintético em dbt/ (staging -> core -> marts)",
+        "4 macros portáveis implementadas (mask_lgpd_pii, generate_surrogate_key_strict, incremental_watermark_filter, audit_run_metadata)",
+        "scripts/lint_dbt_docs.py (100% cobertura) e relatório de exemplo sintético versionado"
+      ],
+      "gate": "dbt build + lint_dbt_docs.py 100% verdes"
+    },
+    {
+      "id": "phase-06",
+      "label": "Fase 06",
+      "name": "Slim CI (state:modified+), SQLFluff & GitHub Pages",
+      "branch": "ci/phase-06-slim-ci-pages",
+      "status": "PENDING",
+      "completed_at": null,
+      "deliverables": [
+        "Workflow Slim CI com diff de manifest.json (dbt build --select state:modified+)",
+        "Configuração .sqlfluff (templater jinja) no CI",
+        "Publicação de dbt docs / linhagem no GitHub Pages"
+      ],
+      "gate": "Workflow demonstrado em PR de teste"
+    },
+    {
+      "id": "phase-07",
+      "label": "Fase 07",
+      "name": "Paridade nas 4 Interfaces (CLI, SDK, FastAPI, MCP)",
+      "branch": "feat/phase-07-multi-interface-parity",
+      "status": "PENDING",
+      "completed_at": null,
+      "deliverables": [
+        "CLI dge (audit, scaffold, transpile, lineage, rules)",
+        "SDK DbtGovernance, FastAPI /api/v1/* e MCP dge-mcp (<untrusted_data>)",
+        "Quickstart clone -> demo em <= 60s e revisão tech-code-reviewer + tech-architect-auditor"
+      ],
+      "gate": "Suíte de paridade entre as 4 interfaces 100% verde"
+    },
+    {
+      "id": "phase-08",
+      "label": "Fase 08",
+      "name": "Integração C.O.R.E. & Atualização de Portfólio",
+      "branch": "feat/dbt-dataops-governance-integration",
+      "status": "PENDING",
+      "completed_at": null,
+      "deliverables": [
+        "Novo POP em core/docs/Tecnicos/Engenharia_Dados_Analytics_Streaming/",
+        "Skill inativa .agents/skills_inactive/tech-dbt-dataops-governance/SKILL.md + evals",
+        "Roteamento nos orquestradores C.O.R.E. e atualização do perfil jhsfhtls/jhsfhtls"
+      ],
+      "gate": "Evals, higiene, check-links e CI verdes no core"
+    }
+  ],
+  "history": [
+    {
+      "date": "2026-11-22",
+      "phase": "Fase 00",
+      "milestone": "ADRs & Catálogo de 25 Regras (PR #1)",
+      "summary": "Publicação de ADR-001 (AST estático sqlglot), ADR-002 (Scaffolder Medallion, ODCS v3.1 e Client Path Shield), 25 regras declarativas em catalog/governance_rules.yaml e scripts/validate_catalog.py."
+    },
+    {
+      "date": "2026-11-22",
+      "phase": "Fase 01",
+      "milestone": "Fundação, Renderizadores Determinísticos & CI/CD (PR #2)",
+      "summary": "Configuração de .venv Python 3.12 com dependências pinadas (==), pyproject.toml, macros_registry.yaml, render_catalog.py, render_progress.py, workflows ci.yml/pr-lint.yml e suíte inicial pytest."
+    }
+  ]
+}
