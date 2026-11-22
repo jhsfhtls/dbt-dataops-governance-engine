@@ -2,7 +2,7 @@
   "schema_version": "1.0.0",
   "last_updated": "2026-11-22",
   "project_name": "dbt-dataops-governance-engine",
-  "current_phase_id": "phase-01",
+  "current_phase_id": "phase-02",
   "overall_status": "ON_TRACK",
   "phases": [
     {
@@ -41,8 +41,8 @@
       "label": "Fase 02",
       "name": "Motor AST de Auditoria Estática (sqlglot)",
       "branch": "feat/phase-02-ast-audit-engine",
-      "status": "PENDING",
-      "completed_at": null,
+      "status": "COMPLETED",
+      "completed_at": "2026-11-22",
       "deliverables": [
         "Pré-processador determinístico e reversível de Jinja dbt",
         "Avaliação AST das 25 regras em SQL/YAML/ODCS",
@@ -146,6 +146,12 @@
       "phase": "Fase 01",
       "milestone": "Fundação, Renderizadores Determinísticos & CI/CD (PR #2)",
       "summary": "Configuração de .venv Python 3.12 com dependências pinadas (==), pyproject.toml, macros_registry.yaml, render_catalog.py, render_progress.py, workflows ci.yml/pr-lint.yml e suíte inicial pytest."
+    },
+    {
+      "date": "2026-11-22",
+      "phase": "Fase 02",
+      "milestone": "Motor AST Estático & 25 Regras de Governança (PR #3)",
+      "summary": "Implementação do AuditEngine em sqlglot com pré-processador Jinja dbt, avaliação das 25 regras (SQL/YAML/ODCS), Scorecard (0-100), relatórios MD/JSON, Client Path Shield e 43 testes offline."
     }
   ]
 }
