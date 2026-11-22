@@ -2,7 +2,7 @@
   "schema_version": "1.0.0",
   "last_updated": "2026-11-22",
   "project_name": "dbt-dataops-governance-engine",
-  "current_phase_id": "phase-04",
+  "current_phase_id": "phase-05",
   "overall_status": "ON_TRACK",
   "phases": [
     {
@@ -82,8 +82,8 @@
       "label": "Fase 05",
       "name": "Projeto dbt de Referência & Macros Portáveis",
       "branch": "feat/phase-05-reference-dbt-project",
-      "status": "PENDING",
-      "completed_at": null,
+      "status": "COMPLETED",
+      "completed_at": "2026-11-22",
       "deliverables": [
         "Projeto dbt sintético em dbt/ (staging -> core -> marts)",
         "4 macros portáveis implementadas (mask_lgpd_pii, generate_surrogate_key_strict, incremental_watermark_filter, audit_run_metadata)",
@@ -164,6 +164,12 @@
       "phase": "Fase 04",
       "milestone": "Scaffolder Medallion & Contratos ODCS v3.1 (PR #5)",
       "summary": "Implementação do MedallionScaffolder a partir de Parquet, CSV, DuckDB e DDL SQL com proteção anti-traversal, geração de sources/staging/core, contract.enforced, unit_tests dbt, ODCS v3.1 e execução real de dbt build em DuckDB."
+    },
+    {
+      "date": "2026-11-22",
+      "phase": "Fase 05",
+      "milestone": "Projeto dbt de Referência & Macros Portáveis (PR #6)",
+      "summary": "Construção do projeto dbt sintético (dge_reference) com 4 macros cross-warehouse (mask_lgpd_pii, generate_surrogate_key_strict, incremental_watermark_filter, audit_run_metadata), lint_dbt_docs.py (100% cobertura) e relatório exemplo versionado."
     }
   ]
 }

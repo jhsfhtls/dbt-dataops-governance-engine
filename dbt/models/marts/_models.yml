@@ -1,0 +1,86 @@
+version: 2
+
+models:
+  - name: mart_revenue_by_segment
+    description: "Anonymized Gold revenue mart aggregated by customer segment and order date with enforced contract."
+    config:
+      contract:
+        enforced: true
+      meta:
+        lgpd_tier: ANONYMIZED_MICRODATA
+    columns:
+      - name: segment_date_sk
+        description: "Strict SHA-256 composite surrogate key for segment and order date."
+        data_type: varchar
+        data_tests:
+          - unique
+          - not_null
+      - name: customer_segment
+        description: "Normalized customer segment cohort."
+        data_type: varchar
+        data_tests:
+          - not_null
+      - name: order_date
+        description: "Calendar date of recognized revenue cohort."
+        data_type: date
+        data_tests:
+          - not_null
+      - name: order_count
+        description: "Distinct count of eligible orders in the cohort."
+        data_type: bigint
+      - name: active_customers
+        description: "Distinct count of anonymized customer surrogate keys in the cohort."
+        data_type: bigint
+      - name: total_gross_usd
+        description: "Total gross revenue in USD."
+        data_type: double
+      - name: total_net_usd
+        description: "Total net revenue after discounts in USD."
+        data_type: double
+      - name: effective_discount_rate
+        description: "Effective cohort discount ratio protected against zero division."
+        data_type: double
+      - name: _dge_invocation_id
+        description: "dbt invocation UUID recorded by audit_run_metadata."
+        data_type: varchar
+      - name: _dge_loaded_at_utc
+        description: "Execution UTC timestamp recorded by audit_run_metadata."
+        data_type: timestamp
+      - name: _dge_model_name
+        description: "Target model relation name recorded by audit_run_metadata."
+        data_type: varchar
+
+unit_tests:
+  - name: test_mart_revenue_by_segment_excludes_cancelled_and_aggregates
+    description: "Verify mart_revenue_by_segment excludes CANCELLED orders and computes cohort net revenue."
+    model: mart_revenue_by_segment
+    given:
+      - input: ref('fct_orders')
+        rows:
+          - order_id: "ord_1"
+            customer_sk: "ck_1"
+            order_status: "PAID"
+            gross_amount_usd: 200.0
+            discount_usd: 20.0
+            net_amount_usd: 180.0
+            order_date: "2026-11-22"
+          - order_id: "ord_2"
+            customer_sk: "ck_1"
+            order_status: "CANCELLED"
+            gross_amount_usd: 500.0
+            discount_usd: 0.0
+            net_amount_usd: 500.0
+            order_date: "2026-11-22"
+      - input: ref('dim_customers')
+        rows:
+          - customer_sk: "ck_1"
+            customer_segment: "ENTERPRISE"
+    expect:
+      rows:
+        - customer_segment: "ENTERPRISE"
+          order_date: "2026-11-22"
+          order_count: 1
+          active_customers: 1
+          total_gross_usd: 200.0
+          total_net_usd: 180.0
+          effective_discount_rate: 0.1

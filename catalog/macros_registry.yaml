@@ -5,7 +5,7 @@ macros:
   - macro_id: mask_lgpd_pii
     name: mask_lgpd_pii
     category: LGPD_PRIVACY
-    status: PLANNED
+    status: IMPLEMENTED
     supported_dialects:
       - duckdb
       - snowflake
@@ -18,7 +18,7 @@ macros:
   - macro_id: generate_surrogate_key_strict
     name: generate_surrogate_key_strict
     category: MODELING_INTEGRITY
-    status: PLANNED
+    status: IMPLEMENTED
     supported_dialects:
       - duckdb
       - snowflake
@@ -31,7 +31,7 @@ macros:
   - macro_id: incremental_watermark_filter
     name: incremental_watermark_filter
     category: PERFORMANCE_FINOPS
-    status: PLANNED
+    status: IMPLEMENTED
     supported_dialects:
       - duckdb
       - snowflake
@@ -44,7 +44,7 @@ macros:
   - macro_id: audit_run_metadata
     name: audit_run_metadata
     category: OBSERVABILITY_LINEAGE
-    status: PLANNED
+    status: IMPLEMENTED
     supported_dialects:
       - duckdb
       - snowflake

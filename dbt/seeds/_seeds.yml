@@ -1,0 +1,27 @@
+version: 2
+
+seeds:
+  - name: raw_synthetic_customers
+    description: "Synthetic customer seed dataset with leading-zero postal codes and fake LGPD attributes."
+    config:
+      column_types:
+        customer_id: varchar
+        full_name: varchar
+        cpf: varchar
+        email: varchar
+        phone: varchar
+        postal_code: varchar
+        customer_segment: varchar
+        updated_at: timestamp
+
+  - name: raw_synthetic_orders
+    description: "Synthetic order seed dataset for Medallion incremental fact and mart modeling."
+    config:
+      column_types:
+        order_id: varchar
+        customer_id: varchar
+        order_status: varchar
+        gross_amount_usd: double
+        discount_usd: double
+        order_date: date
+        updated_at: timestamp

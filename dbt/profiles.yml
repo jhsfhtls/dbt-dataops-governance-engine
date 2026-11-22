@@ -1,0 +1,7 @@
+dge_reference:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('DGE_DUCKDB_PATH', 'dbt/target/dge_reference.duckdb') }}"
+      threads: 4
