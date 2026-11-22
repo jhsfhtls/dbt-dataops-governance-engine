@@ -1,3 +1,4 @@
+-- Anonymized cohort revenue mart governed by Slim CI and enforced contracts.
 {{ config(materialized='table') }}
 
 SELECT
