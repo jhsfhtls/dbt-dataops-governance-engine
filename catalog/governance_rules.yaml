@@ -1,0 +1,798 @@
+schema_version: "1.0.0"
+updated_at: "2026-11-22"
+
+families:
+  - family_id: PERFORMANCE_FINOPS
+    name: Performance & FinOps
+    description: Detects query anti-patterns that inflate cloud warehouse compute spend, trigger full table scans, or break partition pruning.
+  - family_id: MODELING_MEDALLION
+    name: Modeling & Medallion Architecture
+    description: Enforces staging-core-marts isolation, dbt lineage macros, canonical naming conventions, and leading-zero-safe string keys.
+  - family_id: QUALITY_CONTRACTS
+    name: Data Quality & ODCS v3.1 Contracts
+    description: Enforces primary-key assertions, referential integrity, sentinel-to-NULL hygiene, 100% documentation, and enforced contracts.
+  - family_id: LGPD_PII_SECURITY
+    name: LGPD, PII & SQL Security
+    description: Prevents unmasked PII exposure, secret leakage, unsafe SQL interpolation, and unanonymized Gold exports.
+
+rules:
+  - id: PERF_001
+    name: Disallow SELECT * in core and mart final models
+    family: PERFORMANCE_FINOPS
+    severity: HIGH
+    dialects:
+      - duckdb
+      - snowflake
+      - spark
+      - bigquery
+    applies_to:
+      - sql
+      - dbt_model
+    rationale: Wildcard column projections scan unnecessary columnar storage blocks in Snowflake/BigQuery/Parquet and silently break downstream schema contracts when upstream columns change.
+    known_false_positives:
+      - Ephemeral staging passthroughs or `SELECT * EXCLUDE (...)` wrappers intentionally forwarding an explicit contract upstream.
+      - Test fixture queries inside `tests/` asserting row counts (`COUNT(*)`).
+    remediation: Enumerate all required columns explicitly in the `SELECT` projection list and pair them with typed casts and documentation.
+    bad_example: |
+      -- models/marts/mart_orders_summary.sql
+      SELECT *
+      FROM {{ ref('fct_orders') }}
+    good_example: |
+      -- models/marts/mart_orders_summary.sql
+      SELECT
+          order_id,
+          customer_id,
+          order_status,
+          order_total_usd,
+          order_created_at
+      FROM {{ ref('fct_orders') }}
+
+  - id: PERF_002
+    name: Disallow JOIN without predicate or implicit Cartesian cross join
+    family: PERFORMANCE_FINOPS
+    severity: CRITICAL
+    dialects:
+      - duckdb
+      - snowflake
+      - spark
+      - bigquery
+    applies_to:
+      - sql
+      - dbt_model
+    rationale: Unconstrained joins (comma joins without `WHERE` predicates, `JOIN ... ON TRUE`, or unintended `CROSS JOIN`) explode row cardinality quadratically, exhausting cluster memory and FinOps quotas.
+    known_false_positives:
+      - Intentional small date-spine x dimension scaffolding when explicitly capped and documented with a rationale comment.
+    remediation: Add deterministic equality/range join predicates inside an explicit `ON` or `USING` clause, or pre-aggregate to a matching grain before joining.
+    bad_example: |
+      SELECT
+          o.order_id,
+          c.customer_segment
+      FROM {{ ref('stg_demo__orders') }} AS o
+      CROSS JOIN {{ ref('stg_demo__customers') }} AS c
+    good_example: |
+      SELECT
+          o.order_id,
+          c.customer_segment
+      FROM {{ ref('stg_demo__orders') }} AS o
+      INNER JOIN {{ ref('stg_demo__customers') }} AS c
+          ON o.customer_id = c.customer_id
+
+  - id: PERF_003
+    name: Require incremental watermark filter on fact and incremental models
+    family: PERFORMANCE_FINOPS
+    severity: HIGH
+    dialects:
+      - duckdb
+      - snowflake
+      - spark
+      - bigquery
+    applies_to:
+      - dbt_model
+    rationale: Configuring `materialized='incremental'` or building large `fct_*` tables without an `{% if is_incremental() %}` watermark predicate forces full-table reprocessing on every scheduled run.
+    known_false_positives:
+      - Small reference snapshot tables explicitly configured as `materialized='table'` with bounded row volume.
+    remediation: Add an `{% if is_incremental() %}` filter referencing `{{ this }}` with a bounded lookback window on the event/updated timestamp column.
+    bad_example: |
+      {{ config(materialized='incremental', unique_key='order_id') }}
+      SELECT
+          order_id,
+          customer_id,
+          updated_at
+      FROM {{ ref('stg_demo__orders') }}
+    good_example: |
+      {{ config(materialized='incremental', unique_key='order_id') }}
+      SELECT
+          order_id,
+          customer_id,
+          updated_at
+      FROM {{ ref('stg_demo__orders') }}
+      {% if is_incremental() %}
+      WHERE updated_at >= (
+          SELECT COALESCE(MAX(updated_at), TIMESTAMP '1970-01-01 00:00:00') - INTERVAL '3 days'
+          FROM {{ this }}
+      )
+      {% endif %}
+
+  - id: PERF_004
+    name: Disallow non-sargable function calls on columns in WHERE or JOIN predicates
+    family: PERFORMANCE_FINOPS
+    severity: MEDIUM
+    dialects:
+      - duckdb
+      - snowflake
+      - spark
+      - bigquery
+    applies_to:
+      - sql
+      - dbt_model
+    rationale: Wrapping indexed or partitioned columns in scalar functions (such as `YEAR(created_at)`, `CAST(created_at AS DATE)`, or `LOWER(email)`) prevents micro-partition pruning and index pushdown.
+    known_false_positives:
+      - Filters on low-cardinality staging attributes where upstream normalization has not yet materialized a canonical column.
+    remediation: Rewrite predicates as range comparisons (`created_at >= '2026-01-01' AND created_at < '2027-01-01'`) or normalize the column once in staging.
+    bad_example: |
+      SELECT order_id, order_total_usd
+      FROM {{ ref('stg_demo__orders') }}
+      WHERE EXTRACT(YEAR FROM order_created_at) = 2026
+    good_example: |
+      SELECT order_id, order_total_usd
+      FROM {{ ref('stg_demo__orders') }}
+      WHERE order_created_at >= TIMESTAMP '2026-01-01 00:00:00'
+        AND order_created_at < TIMESTAMP '2027-01-01 00:00:00'
+
+  - id: PERF_005
+    name: Flag repeated correlated subqueries as candidates for CTE materialization
+    family: PERFORMANCE_FINOPS
+    severity: HIGH
+    dialects:
+      - duckdb
+      - snowflake
+      - spark
+      - bigquery
+    applies_to:
+      - sql
+      - dbt_model
+    rationale: Multiple scalar or correlated subqueries in `SELECT` or `WHERE` force repeated scans of the same source table instead of a single pre-aggregated join or window pass.
+    known_false_positives:
+      - Single lightweight `EXISTS` semi-join over a small pre-filtered dimension table when the optimizer rewrites it as a hash semi-join.
+    remediation: Consolidate repeated subqueries into a pre-aggregated CTE joined once on the shared key, or replace with a window function.
+    bad_example: |
+      SELECT
+          c.customer_id,
+          (SELECT COUNT(*) FROM {{ ref('stg_demo__orders') }} AS o WHERE o.customer_id = c.customer_id) AS order_count,
+          (SELECT SUM(o.order_total_usd) FROM {{ ref('stg_demo__orders') }} AS o WHERE o.customer_id = c.customer_id) AS lifetime_spend
+      FROM {{ ref('stg_demo__customers') }} AS c
+    good_example: |
+      WITH customer_order_metrics AS (
+          SELECT
+              customer_id,
+              COUNT(*) AS order_count,
+              SUM(order_total_usd) AS lifetime_spend
+          FROM {{ ref('stg_demo__orders') }}
+          GROUP BY customer_id
+      )
+      SELECT
+          c.customer_id,
+          COALESCE(m.order_count, 0) AS order_count,
+          COALESCE(m.lifetime_spend, 0) AS lifetime_spend
+      FROM {{ ref('stg_demo__customers') }} AS c
+      LEFT JOIN customer_order_metrics AS m
+          ON c.customer_id = m.customer_id
+
+  - id: PERF_006
+    name: Disallow ORDER BY without LIMIT inside CTEs, subqueries, or non-final models
+    family: PERFORMANCE_FINOPS
+    severity: MEDIUM
+    dialects:
+      - duckdb
+      - snowflake
+      - spark
+      - bigquery
+    applies_to:
+      - sql
+      - dbt_model
+    rationale: Unbounded `ORDER BY` inside CTEs or dbt views triggers an expensive distributed global sort whose row ordering is discarded by downstream relational operators.
+    known_false_positives:
+      - "`ORDER BY` inside `OVER (...)` window clauses or `ARRAY_AGG(... ORDER BY ...)` aggregate specifications."
+      - Top-N CTEs that explicitly specify `LIMIT`.
+    remediation: Remove `ORDER BY` from intermediate CTEs and views, or pair it with `LIMIT` / `QUALIFY ROW_NUMBER()` when selecting Top-N rows.
+    bad_example: |
+      WITH sorted_orders AS (
+          SELECT order_id, customer_id, order_created_at
+          FROM {{ ref('stg_demo__orders') }}
+          ORDER BY order_created_at DESC
+      )
+      SELECT order_id, customer_id
+      FROM sorted_orders
+    good_example: |
+      WITH recent_orders AS (
+          SELECT order_id, customer_id, order_created_at
+          FROM {{ ref('stg_demo__orders') }}
+      )
+      SELECT order_id, customer_id
+      FROM recent_orders
+
+  - id: PERF_007
+    name: Flag SELECT DISTINCT or UNION masking join fan-out and triggering shuffles
+    family: PERFORMANCE_FINOPS
+    severity: MEDIUM
+    dialects:
+      - duckdb
+      - snowflake
+      - spark
+      - bigquery
+    applies_to:
+      - sql
+      - dbt_model
+    rationale: Broad `SELECT DISTINCT` or `UNION` (instead of `UNION ALL`) introduces full-dataset hash/sort deduplication overhead and frequently hides broken join granularity.
+    known_false_positives:
+      - Explicit single-column domain lookup tables derived from an un-deduplicated event stream when `GROUP BY` is unavailable.
+    remediation: Deduplicate upstream relations via `QUALIFY ROW_NUMBER() OVER (...) = 1`, fix join keys to avoid fan-out, and replace `UNION` with `UNION ALL` for disjoint branches.
+    bad_example: |
+      SELECT DISTINCT
+          o.order_id,
+          o.customer_id,
+          p.payment_method
+      FROM {{ ref('stg_demo__orders') }} AS o
+      LEFT JOIN {{ ref('stg_demo__payments') }} AS p
+          ON o.order_id = p.order_id
+    good_example: |
+      WITH latest_payments AS (
+          SELECT
+              order_id,
+              payment_method,
+              ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY paid_at DESC) AS rn
+          FROM {{ ref('stg_demo__payments') }}
+      )
+      SELECT
+          o.order_id,
+          o.customer_id,
+          p.payment_method
+      FROM {{ ref('stg_demo__orders') }} AS o
+      LEFT JOIN latest_payments AS p
+          ON o.order_id = p.order_id
+         AND p.rn = 1
+
+  - id: MOD_001
+    name: Disallow hardcoded physical table references instead of dbt ref or source
+    family: MODELING_MEDALLION
+    severity: CRITICAL
+    dialects:
+      - duckdb
+      - snowflake
+      - spark
+      - bigquery
+    applies_to:
+      - dbt_model
+    rationale: Hardcoding `database.schema.table` bypasses dbt DAG dependency tracking, breaks Slim CI `state:modified+` selection, and couples code to a single environment.
+    known_false_positives:
+      - Standalone non-dbt legacy SQL migration scripts audited prior to dbt refactoring.
+    remediation: Replace hardcoded table paths with `{{ source('source_name', 'table_name') }}` in staging and `{{ ref('model_name') }}` downstream.
+    bad_example: |
+      SELECT order_id, customer_id
+      FROM analytics_prod.raw_demo.orders
+    good_example: |
+      SELECT order_id, customer_id
+      FROM {{ source('raw_demo', 'orders') }}
+
+  - id: MOD_002
+    name: Enforce Medallion isolation by disallowing source calls in core and marts
+    family: MODELING_MEDALLION
+    severity: HIGH
+    dialects:
+      - duckdb
+      - snowflake
+      - spark
+      - bigquery
+    applies_to:
+      - dbt_model
+    rationale: Allowing `core` (`dim_*`, `fct_*`) or `marts` models to read `{{ source() }}` directly bypasses staging type normalization, sentinel cleanup, and PII masking gates.
+    known_false_positives:
+      - Dedicated seed/reference lookup bridges explicitly placed under `models/staging/`.
+    remediation: Route every raw source through a dedicated `stg_*` model and reference that staging model via `{{ ref('stg_*') }}` in `core` and `marts`.
+    bad_example: |
+      -- models/core/fct_orders.sql
+      SELECT order_id, customer_id, total_amount
+      FROM {{ source('raw_demo', 'orders') }}
+    good_example: |
+      -- models/core/fct_orders.sql
+      SELECT order_id, customer_id, order_total_usd
+      FROM {{ ref('stg_demo__orders') }}
+
+  - id: MOD_003
+    name: Disallow multi-table joins or business aggregations inside staging models
+    family: MODELING_MEDALLION
+    severity: MEDIUM
+    dialects:
+      - duckdb
+      - snowflake
+      - spark
+      - bigquery
+    applies_to:
+      - dbt_model
+    rationale: Staging models (`stg_*`) should perform 1:1 source standardization (renaming, casting, trimming, sentinel NULLs); adding joins or `GROUP BY` obscures lineage and grain.
+    known_false_positives:
+      - Single-source deduplication CTE using `ROW_NUMBER()` without collapsing business grain.
+    remediation: Keep `stg_*` strictly 1:1 with its source table and move joins or aggregations into `int_*`, `core`, or `marts` models.
+    bad_example: |
+      -- models/staging/stg_demo__orders.sql
+      SELECT
+          o.customer_id,
+          COUNT(*) AS total_orders
+      FROM {{ source('raw_demo', 'orders') }} AS o
+      INNER JOIN {{ source('raw_demo', 'customers') }} AS c
+          ON o.customer_id = c.customer_id
+      GROUP BY o.customer_id
+    good_example: |
+      -- models/staging/stg_demo__orders.sql
+      SELECT
+          CAST(order_id AS VARCHAR) AS order_id,
+          CAST(customer_id AS VARCHAR) AS customer_id,
+          CAST(total_amount AS DECIMAL(18, 2)) AS order_total_usd
+      FROM {{ source('raw_demo', 'orders') }}
+
+  - id: MOD_004
+    name: Enforce canonical Medallion model naming prefixes
+    family: MODELING_MEDALLION
+    severity: LOW
+    dialects:
+      - duckdb
+      - snowflake
+      - spark
+      - bigquery
+    applies_to:
+      - dbt_model
+    rationale: Consistent prefixes (`stg_`, `int_`, `dim_`, `fct_`, `mart_`) make layer boundaries, grain, and Slim CI impact self-evident to engineers and automated linters.
+    known_false_positives:
+      - Snapshot models in `snapshots/` or ephemeral utilities explicitly scoped in `dbt_project.yml`.
+    remediation: Rename model SQL files and YAML schema entries to start with `stg_`, `int_`, `dim_`, `fct_`, or `mart_` matching their layer folder.
+    bad_example: |
+      -- models/core/orders_clean.sql
+      SELECT order_id, customer_id
+      FROM {{ ref('stg_demo__orders') }}
+    good_example: |
+      -- models/core/fct_orders.sql
+      SELECT order_id, customer_id
+      FROM {{ ref('stg_demo__orders') }}
+
+  - id: MOD_005
+    name: Disallow deeply nested subqueries in favor of modular CTEs
+    family: MODELING_MEDALLION
+    severity: MEDIUM
+    dialects:
+      - duckdb
+      - snowflake
+      - spark
+      - bigquery
+    applies_to:
+      - sql
+      - dbt_model
+    rationale: Subqueries nested 3 or more levels deep degrade readability, hinder code review, and obscure intermediate transformation grains compared to named CTEs.
+    known_false_positives:
+      - Automatically generated SQL emitted by BI tools prior to manual refactoring.
+    remediation: Flatten nested inline subqueries into sequential, single-purpose CTEs (`source_data`, `cleaned`, `final`).
+    bad_example: |
+      SELECT customer_id, avg_amount
+      FROM (
+          SELECT customer_id, AVG(order_total_usd) AS avg_amount
+          FROM (
+              SELECT customer_id, order_total_usd
+              FROM (
+                  SELECT customer_id, order_total_usd
+                  FROM {{ ref('stg_demo__orders') }}
+              ) AS s1
+          ) AS s2
+          GROUP BY customer_id
+      ) AS s3
+    good_example: |
+      WITH base_orders AS (
+          SELECT customer_id, order_total_usd
+          FROM {{ ref('stg_demo__orders') }}
+      ),
+      customer_averages AS (
+          SELECT customer_id, AVG(order_total_usd) AS avg_amount
+          FROM base_orders
+          GROUP BY customer_id
+      )
+      SELECT customer_id, avg_amount
+      FROM customer_averages
+
+  - id: MOD_006
+    name: Disallow numeric coercion on canonical string identifier keys
+    family: MODELING_MEDALLION
+    severity: HIGH
+    dialects:
+      - duckdb
+      - snowflake
+      - spark
+      - bigquery
+    applies_to:
+      - sql
+      - dbt_model
+    rationale: Casting identifiers with leading zeros (`cnpj`, `cpf`, `cep`, `ibge`, `id_municipio`, `postal_code`, `zip_code`) to `INT`/`BIGINT`/`NUMBER` silently corrupts keys and breaks joins.
+    known_false_positives:
+      - Explicit integer check-digit arithmetic performed inside a dedicated validation macro after preserving the canonical `VARCHAR` column.
+    remediation: Cast canonical identifiers strictly to `VARCHAR`/`STRING`, apply `TRIM()`, and preserve zero-padded fixed widths with `LPAD()`.
+    bad_example: |
+      SELECT
+          CAST(postal_code AS BIGINT) AS postal_code,
+          CAST(tax_id_cnpj AS INT64) AS tax_id_cnpj
+      FROM {{ source('raw_demo', 'merchants') }}
+    good_example: |
+      SELECT
+          LPAD(TRIM(CAST(postal_code AS VARCHAR)), 8, '0') AS postal_code,
+          LPAD(TRIM(CAST(tax_id_cnpj AS VARCHAR)), 14, '0') AS tax_id_cnpj
+      FROM {{ source('raw_demo', 'merchants') }}
+
+  - id: QUAL_001
+    name: Require primary key unique and not_null tests on every dbt model
+    family: QUALITY_CONTRACTS
+    severity: CRITICAL
+    dialects:
+      - duckdb
+      - snowflake
+      - spark
+      - bigquery
+    applies_to:
+      - dbt_yaml
+    rationale: Without both `unique` and `not_null` schema assertions on the primary key, duplicate fan-out rows or null join keys silently inflate business metrics downstream.
+    known_false_positives:
+      - Composite-key models tested via `dbt_utils.unique_combination_of_columns` at model level instead of single-column `unique`.
+    remediation: Declare `unique` and `not_null` `data_tests` on the primary-key column (or composite uniqueness test at model level) in `_models.yml`.
+    bad_example: |
+      models:
+        - name: fct_orders
+          columns:
+            - name: order_id
+              description: Order identifier.
+    good_example: |
+      models:
+        - name: fct_orders
+          columns:
+            - name: order_id
+              description: Unique surrogate primary key for each order.
+              data_tests:
+                - unique
+                - not_null
+
+  - id: QUAL_002
+    name: Require 100 percent model and column documentation coverage
+    family: QUALITY_CONTRACTS
+    severity: MEDIUM
+    dialects:
+      - duckdb
+      - snowflake
+      - spark
+      - bigquery
+    applies_to:
+      - dbt_yaml
+    rationale: Undocumented models and columns stall onboarding, prevent catalog discovery, and fail automated governance checks such as `lint_dbt_docs.py`.
+    known_false_positives:
+      - Temporary scratch models excluded from production manifests before PR review.
+    remediation: Populate meaningful non-empty `description` fields for every model and every column in `_models.yml`.
+    bad_example: |
+      models:
+        - name: dim_customers
+          columns:
+            - name: customer_id
+    good_example: |
+      models:
+        - name: dim_customers
+          description: Conformed customer dimension containing anonymized account attributes.
+          columns:
+            - name: customer_id
+              description: Unique canonical customer identifier.
+
+  - id: QUAL_003
+    name: Require enforced dbt model contracts or ODCS v3.1 contracts on public marts
+    family: QUALITY_CONTRACTS
+    severity: HIGH
+    dialects:
+      - duckdb
+      - snowflake
+      - spark
+      - bigquery
+    applies_to:
+      - dbt_yaml
+      - odcs_contract
+    rationale: "Public `core` and `marts` tables consumed by BI, ML, or external APIs require `contract: {enforced: true}` and declared `data_type` constraints (or ODCS v3.1 specs) to fail fast on breaking schema drift."
+    known_false_positives:
+      - Ephemeral internal intermediate models (`int_*`) not exposed to external consumers.
+    remediation: "Enable `config: {contract: {enforced: true}}` with explicit `data_type` on every column in `_models.yml` and maintain an accompanying ODCS v3.1 `contract.yaml`."
+    bad_example: |
+      models:
+        - name: mart_revenue_daily
+          description: Daily revenue mart.
+          columns:
+            - name: metric_date
+              description: Calendar date of recognized revenue.
+    good_example: |
+      models:
+        - name: mart_revenue_daily
+          description: Daily revenue mart governed by an enforced contract.
+          config:
+            contract:
+              enforced: true
+          columns:
+            - name: metric_date
+              description: Calendar date of recognized revenue.
+              data_type: date
+
+  - id: QUAL_004
+    name: Require explicit sentinel-to-NULL sanitization in staging models
+    family: QUALITY_CONTRACTS
+    severity: MEDIUM
+    dialects:
+      - duckdb
+      - snowflake
+      - spark
+      - bigquery
+    applies_to:
+      - sql
+      - dbt_model
+    rationale: Legacy extracts frequently encode missing values as `'-1'`, `'99'`, `'999'`, `'N/A'`, `'UNKNOWN'`, or `''`, skewing averages, `COUNT(col)` metrics, and ML features when not converted to `NULL`.
+    known_false_positives:
+      - Legitimate numeric quantities or category codes where `0` or `99` is a genuine domain value rather than a sentinel.
+    remediation: Normalize string whitespace with `TRIM()` and convert known sentinel literals to `NULL` via `NULLIF()` or `CASE WHEN ... THEN NULL`.
+    bad_example: |
+      -- models/staging/stg_demo__customers.sql
+      SELECT
+          customer_id,
+          country_code,
+          age_years
+      FROM {{ source('raw_demo', 'customers') }}
+    good_example: |
+      -- models/staging/stg_demo__customers.sql
+      SELECT
+          customer_id,
+          NULLIF(NULLIF(UPPER(TRIM(country_code)), ''), 'N/A') AS country_code,
+          CASE WHEN age_years IN (-1, 999) THEN NULL ELSE age_years END AS age_years
+      FROM {{ source('raw_demo', 'customers') }}
+
+  - id: QUAL_005
+    name: Require NULLIF zero-division protection on denominator expressions
+    family: QUALITY_CONTRACTS
+    severity: MEDIUM
+    dialects:
+      - duckdb
+      - snowflake
+      - spark
+      - bigquery
+    applies_to:
+      - sql
+      - dbt_model
+    rationale: Unprotected division expressions (`numerator / denominator`) crash batch pipelines on DuckDB/Snowflake or emit silent `Infinity`/`NaN` values when zero counts appear.
+    known_false_positives:
+      - Division by a strictly non-zero positive numeric literal constant (e.g., `/ 100.0`).
+    remediation: Wrap dynamic denominator expressions with `NULLIF(denominator, 0)` (or `SAFE_DIVIDE` in BigQuery).
+    bad_example: |
+      SELECT
+          order_id,
+          discount_usd / gross_amount_usd AS discount_rate
+      FROM {{ ref('stg_demo__orders') }}
+    good_example: |
+      SELECT
+          order_id,
+          discount_usd / NULLIF(gross_amount_usd, 0) AS discount_rate
+      FROM {{ ref('stg_demo__orders') }}
+
+  - id: QUAL_006
+    name: Require relationships referential integrity test on foreign-key columns
+    family: QUALITY_CONTRACTS
+    severity: LOW
+    dialects:
+      - duckdb
+      - snowflake
+      - spark
+      - bigquery
+    applies_to:
+      - dbt_yaml
+    rationale: Fact models referencing dimension foreign keys (`*_id`, `*_sk`, `*_key`) without a `relationships` test allow orphan records that quietly drop rows in inner-join BI reports.
+    known_false_positives:
+      - Late-arriving dimension keys intentionally bridged to an explicit `'UNKNOWN'` sentinel surrogate row prior to reconciliation.
+    remediation: "Add a dbt `relationships` test pointing `to: ref('dim_*')` and `field: <pk>` on foreign-key columns in `_models.yml`."
+    bad_example: |
+      models:
+        - name: fct_orders
+          columns:
+            - name: customer_id
+              description: Foreign key to customer dimension.
+              data_tests:
+                - not_null
+    good_example: |
+      models:
+        - name: fct_orders
+          columns:
+            - name: customer_id
+              description: Foreign key to customer dimension.
+              data_tests:
+                - not_null
+                - relationships:
+                    to: ref('dim_customers')
+                    field: customer_id
+
+  - id: LGPD_001
+    name: Disallow unmasked PII columns without a masking or hashing macro
+    family: LGPD_PII_SECURITY
+    severity: CRITICAL
+    dialects:
+      - duckdb
+      - snowflake
+      - spark
+      - bigquery
+    applies_to:
+      - sql
+      - dbt_model
+    rationale: Projecting raw sensitive personal identifiers (`cpf`, `email`, `telefone`, `celular`, `rg`, `cnh`, `nome_completo`, `ssn`, `passport`) violates LGPD data minimization (Art. 6) and leaks PII into analytics layers.
+    known_false_positives:
+      - Restricted compliance quarantine tables where masking is applied downstream with documented `meta.lgpd_tier` access controls.
+    remediation: Wrap PII columns in a portable masking macro such as `{{ mask_lgpd_pii('email', mode='email') }}` or replace with a salted surrogate hash.
+    bad_example: |
+      SELECT
+          customer_id,
+          cpf,
+          email,
+          telefone
+      FROM {{ source('raw_demo', 'customers') }}
+    good_example: |
+      SELECT
+          customer_id,
+          {{ mask_lgpd_pii('cpf', mode='cpf') }} AS cpf_masked,
+          {{ mask_lgpd_pii('email', mode='email') }} AS email_masked,
+          {{ mask_lgpd_pii('telefone', mode='phone') }} AS telefone_masked
+      FROM {{ source('raw_demo', 'customers') }}
+
+  - id: LGPD_002
+    name: Disallow plaintext PII columns in JOIN or GROUP BY clauses
+    family: LGPD_PII_SECURITY
+    severity: HIGH
+    dialects:
+      - duckdb
+      - snowflake
+      - spark
+      - bigquery
+    applies_to:
+      - sql
+      - dbt_model
+    rationale: Joining or grouping directly on raw `cpf`, `email`, or `telefone` propagates plaintext PII into query execution plans, logs, and downstream composite keys.
+    known_false_positives:
+      - Staging deduplication when no anonymized surrogate key exists yet and the output immediately drops the raw PII column.
+    remediation: Join and group on an anonymized surrogate key (`{{ generate_surrogate_key_strict(['customer_id']) }}` or salted SHA-256 token) rather than plaintext PII.
+    bad_example: |
+      SELECT
+          c.email,
+          COUNT(o.order_id) AS order_count
+      FROM {{ ref('stg_demo__customers') }} AS c
+      INNER JOIN {{ ref('stg_demo__leads') }} AS l
+          ON c.email = l.email
+      GROUP BY c.email
+    good_example: |
+      SELECT
+          c.customer_surrogate_key,
+          COUNT(o.order_id) AS order_count
+      FROM {{ ref('stg_demo__customers') }} AS c
+      INNER JOIN {{ ref('stg_demo__leads') }} AS l
+          ON c.customer_surrogate_key = l.customer_surrogate_key
+      GROUP BY c.customer_surrogate_key
+
+  - id: LGPD_003
+    name: Require meta.lgpd_tier classification on models handling personal attributes
+    family: LGPD_PII_SECURITY
+    severity: MEDIUM
+    dialects:
+      - duckdb
+      - snowflake
+      - spark
+      - bigquery
+    applies_to:
+      - dbt_yaml
+      - odcs_contract
+    rationale: Models processing customer, partner, or masked personal attributes require explicit `meta.lgpd_tier` metadata so governance catalogs and access-control policies remain auditable.
+    known_false_positives:
+      - Pure macroeconomic, calendar, or geographic aggregate dimensions without any personal entities.
+    remediation: "Add `meta: {lgpd_tier: ...}` (e.g., `ANONYMIZED_MICRODATA`, `PSEUDONYMIZED_PII`, `PUBLIC_NON_PERSONAL`) to the model YAML metadata block."
+    bad_example: |
+      models:
+        - name: dim_customers
+          description: Customer dimension containing masked identifiers.
+          columns:
+            - name: customer_id
+              description: Surrogate customer key.
+    good_example: |
+      models:
+        - name: dim_customers
+          description: Customer dimension containing masked identifiers.
+          config:
+            meta:
+              lgpd_tier: PSEUDONYMIZED_PII
+              pii_masked: true
+          columns:
+            - name: customer_id
+              description: Surrogate customer key.
+
+  - id: LGPD_004
+    name: Disallow hardcoded credentials, passwords, or API tokens in SQL or YAML
+    family: LGPD_PII_SECURITY
+    severity: CRITICAL
+    dialects:
+      - duckdb
+      - snowflake
+      - spark
+      - bigquery
+    applies_to:
+      - sql
+      - dbt_model
+      - dbt_yaml
+    rationale: Embedding passwords, storage keys, or bearer tokens in SQL/YAML files risks immediate credential exposure via Git history and CI logs.
+    known_false_positives:
+      - Environment-variable Jinja lookups such as `{{ env_var('WAREHOUSE_TOKEN') }}` with no literal secret value.
+    remediation: Remove all literal credentials immediately and inject warehouse authentication exclusively via `env_var(...)` or secret managers.
+    bad_example: |
+      CREATE SECRET ext_storage (
+          TYPE S3,
+          KEY_ID 'example_key_id_placeholder',
+          SECRET 'example_literal_secret_value'
+      );
+    good_example: |
+      -- profiles.yml / external secret manager via env_var
+      password: "{{ env_var('WAREHOUSE_PASSWORD') }}"
+
+  - id: LGPD_005
+    name: Disallow unsafe dynamic SQL or raw string interpolation susceptible to injection
+    family: LGPD_PII_SECURITY
+    severity: CRITICAL
+    dialects:
+      - duckdb
+      - snowflake
+      - spark
+      - bigquery
+    applies_to:
+      - sql
+      - dbt_model
+    rationale: Unsanitized `EXECUTE IMMEDIATE` with concatenated strings or unvalidated Jinja SQL interpolation exposes analytics warehouses to SQL injection and unauthorized DDL/DML execution.
+    known_false_positives:
+      - Parameterized warehouse statements using explicit bind variables (`USING (...)`) or allowlisted dbt adapter quote helpers (`adapter.quote(...)`).
+    remediation: Eliminate dynamic string concatenation in SQL; use declarative dbt models, explicit allowlists, or `adapter.quote()` / bind parameters.
+    bad_example: |
+      {% set target_filter = var('user_filter') %}
+      EXECUTE IMMEDIATE 'DELETE FROM analytics.audit_log WHERE actor = ' || '{{ target_filter }}';
+    good_example: |
+      SELECT
+          event_id,
+          actor_hash,
+          event_timestamp
+      FROM {{ ref('stg_demo__audit_events') }}
+      WHERE actor_hash = {{ adapter.quote(var('actor_hash')) }}
+
+  - id: LGPD_006
+    name: Disallow exporting unmasked PII into Gold marts without anonymization
+    family: LGPD_PII_SECURITY
+    severity: CRITICAL
+    dialects:
+      - duckdb
+      - snowflake
+      - spark
+      - bigquery
+    applies_to:
+      - dbt_model
+    rationale: Models in `models/marts/` serve BI dashboards and external data products; exporting individual PII columns (`cpf`, `email`, `telefone`, `birth_date`, `full_address`) violates LGPD Art. 12/14 anonymization boundaries.
+    known_false_positives:
+      - Cohort-level aggregates (`COUNT(DISTINCT customer_surrogate_key)`) or models that expose only `*_masked` or hashed surrogate keys.
+    remediation: Aggregate marts to business cohorts (with k-anonymity thresholds where needed) or expose only irreversible hashes and masked fields (`*_masked`).
+    bad_example: |
+      -- models/marts/mart_customer_contacts.sql
+      SELECT
+          customer_id,
+          full_name,
+          email,
+          cpf,
+          birth_date
+      FROM {{ ref('dim_customers') }}
+    good_example: |
+      -- models/marts/mart_customer_cohorts.sql
+      SELECT
+          customer_segment,
+          signup_month,
+          COUNT(DISTINCT customer_surrogate_key) AS active_customers,
+          SUM(lifetime_spend_usd) AS cohort_revenue_usd
+      FROM {{ ref('dim_customers') }}
+      GROUP BY customer_segment, signup_month
