@@ -14,10 +14,10 @@ Este documento e gerado de forma deterministica a partir de [`state/project_prog
 
 ## 1. Painel de Status Executivo
 
-- **Fase Atual:** `Fase 04 - Scaffolder Medallion Automatizado & Contratos ODCS v3.1`
+- **Fase Atual:** `Fase 05 - Projeto dbt de Referência & Macros Portáveis`
 - **Status Geral:** `ON_TRACK`
-- **Progresso Estrutural:** **5 de 9 Fases Concluidas (55.6%)**
-- **Proxima Etapa Planejada:** `Fase 05 - Projeto dbt de Referência & Macros Portáveis`
+- **Progresso Estrutural:** **6 de 9 Fases Concluidas (66.7%)**
+- **Proxima Etapa Planejada:** `Fase 06 - Slim CI (state:modified+), SQLFluff & GitHub Pages`
 - **Regras de Governanca Catalogadas:** **25 regras** em **4 familias**
 - **Macros Portaveis Registradas:** **4 macros cross-warehouse**
 
@@ -28,7 +28,7 @@ flowchart LR
     P02["Fase 02: CONCLUIDO"]
     P03["Fase 03: CONCLUIDO"]
     P04["Fase 04: CONCLUIDO"]
-    P05["Fase 05: PENDENTE"]
+    P05["Fase 05: CONCLUIDO"]
     P06["Fase 06: PENDENTE"]
     P07["Fase 07: PENDENTE"]
     P08["Fase 08: PENDENTE"]
@@ -53,7 +53,7 @@ flowchart LR
 | **Fase 02** | Motor AST de Auditoria Estática (sqlglot) | `feat/phase-02-ast-audit-engine` | `CONCLUIDO` | `2026-11-22` | - Pré-processador determinístico e reversível de Jinja dbt<br/>- Avaliação AST das 25 regras em SQL/YAML/ODCS<br/>- Scorecard (0-100), relatório FinOps/LGPD (MD/JSON) e Client Path Shield | >= 1 teste positivo e >= 1 negativo por regra + falsos positivos documentados |
 | **Fase 03** | Transpilação Multi-Cloud & Otimização Incremental | `feat/phase-03-transpiler-incremental` | `CONCLUIDO` | `2026-11-22` | - Transpilador DuckDB <-> Spark SQL (Databricks) <-> Snowflake<br/>- Consultor de conversão full-refresh -> incremental (merge/delete+insert, unique_key, watermark) | Round-trip validado em corpus de teste; limitações documentadas |
 | **Fase 04** | Scaffolder Medallion Automatizado & Contratos ODCS v3.1 | `feat/phase-04-medallion-scaffolder` | `CONCLUIDO` | `2026-11-22` | - Geração de source.yml, stg_*.sql, dim_*/fct_*, _models.yml e contract.yaml ODCS v3.1<br/>- Testes unique/not_null/accepted_values/relationships e esqueleto de dbt unit test<br/>- Validação estrita de diretório de saída (anti-path-traversal) | Projeto gerado compila e passa dbt build em DuckDB no CI |
-| **Fase 05** | Projeto dbt de Referência & Macros Portáveis | `feat/phase-05-reference-dbt-project` | `PENDENTE` | `—` | - Projeto dbt sintético em dbt/ (staging -> core -> marts)<br/>- 4 macros portáveis implementadas (mask_lgpd_pii, generate_surrogate_key_strict, incremental_watermark_filter, audit_run_metadata)<br/>- scripts/lint_dbt_docs.py (100% cobertura) e relatório de exemplo sintético versionado | dbt build + lint_dbt_docs.py 100% verdes |
+| **Fase 05** | Projeto dbt de Referência & Macros Portáveis | `feat/phase-05-reference-dbt-project` | `CONCLUIDO` | `2026-11-22` | - Projeto dbt sintético em dbt/ (staging -> core -> marts)<br/>- 4 macros portáveis implementadas (mask_lgpd_pii, generate_surrogate_key_strict, incremental_watermark_filter, audit_run_metadata)<br/>- scripts/lint_dbt_docs.py (100% cobertura) e relatório de exemplo sintético versionado | dbt build + lint_dbt_docs.py 100% verdes |
 | **Fase 06** | Slim CI (state:modified+), SQLFluff & GitHub Pages | `ci/phase-06-slim-ci-pages` | `PENDENTE` | `—` | - Workflow Slim CI com diff de manifest.json (dbt build --select state:modified+)<br/>- Configuração .sqlfluff (templater jinja) no CI<br/>- Publicação de dbt docs / linhagem no GitHub Pages | Workflow demonstrado em PR de teste |
 | **Fase 07** | Paridade nas 4 Interfaces (CLI, SDK, FastAPI, MCP) | `feat/phase-07-multi-interface-parity` | `PENDENTE` | `—` | - CLI dge (audit, scaffold, transpile, lineage, rules)<br/>- SDK DbtGovernance, FastAPI /api/v1/* e MCP dge-mcp (<untrusted_data>)<br/>- Quickstart clone -> demo em <= 60s e revisão tech-code-reviewer + tech-architect-auditor | Suíte de paridade entre as 4 interfaces 100% verde |
 | **Fase 08** | Integração C.O.R.E. & Atualização de Portfólio | `feat/dbt-dataops-governance-integration` | `PENDENTE` | `—` | - Novo POP em core/docs/Tecnicos/Engenharia_Dados_Analytics_Streaming/<br/>- Skill inativa .agents/skills_inactive/tech-dbt-dataops-governance/SKILL.md + evals<br/>- Roteamento nos orquestradores C.O.R.E. e atualização do perfil jhsfhtls/jhsfhtls | Evals, higiene, check-links e CI verdes no core |
@@ -69,6 +69,7 @@ flowchart LR
 | `2026-11-22` | **Fase 02** | Motor AST Estático & 25 Regras de Governança (PR #3) | Implementação do AuditEngine em sqlglot com pré-processador Jinja dbt, avaliação das 25 regras (SQL/YAML/ODCS), Scorecard (0-100), relatórios MD/JSON, Client Path Shield e 43 testes offline. |
 | `2026-11-22` | **Fase 03** | Transpilação Multi-Cloud & Otimização Incremental (PR #4) | Implementação do MultiCloudTranspiler (DuckDB <-> Spark SQL/Databricks <-> Snowflake + BigQuery) com preservação de Jinja dbt, detecção explícita de limitações, IncrementalOptimizer e suíte de round-trip. |
 | `2026-11-22` | **Fase 04** | Scaffolder Medallion & Contratos ODCS v3.1 (PR #5) | Implementação do MedallionScaffolder a partir de Parquet, CSV, DuckDB e DDL SQL com proteção anti-traversal, geração de sources/staging/core, contract.enforced, unit_tests dbt, ODCS v3.1 e execução real de dbt build em DuckDB. |
+| `2026-11-22` | **Fase 05** | Projeto dbt de Referência & Macros Portáveis (PR #6) | Construção do projeto dbt sintético (dge_reference) com 4 macros cross-warehouse (mask_lgpd_pii, generate_surrogate_key_strict, incremental_watermark_filter, audit_run_metadata), lint_dbt_docs.py (100% cobertura) e relatório exemplo versionado. |
 
 ---
 

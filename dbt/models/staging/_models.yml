@@ -1,0 +1,81 @@
+version: 2
+
+models:
+  - name: stg_synthetic__customers
+    description: "Standardized staging view for synthetic customers with LGPD PII masking and zero-padded postal codes."
+    config:
+      meta:
+        lgpd_tier: PSEUDONYMIZED_PII
+    columns:
+      - name: customer_id
+        description: "Natural canonical customer identifier."
+        data_tests:
+          - unique
+          - not_null
+      - name: customer_sk
+        description: "Strict SHA-256 surrogate key derived from customer_id."
+        data_tests:
+          - unique
+          - not_null
+      - name: full_name_hash
+        description: "Irreversible SHA-256 hash of synthetic customer full name."
+      - name: cpf_masked
+        description: "LGPD-masked CPF representation."
+      - name: email_masked
+        description: "LGPD-masked email representation preserving domain only."
+      - name: phone_masked
+        description: "LGPD-masked phone representation preserving last four digits only."
+      - name: postal_code
+        description: "Zero-padded 8-character canonical postal code."
+      - name: customer_segment
+        description: "Normalized customer commercial tier."
+        data_tests:
+          - accepted_values:
+              values: ["ENTERPRISE", "SMB", "UNCLASSIFIED"]
+      - name: updated_at
+        description: "UTC timestamp of last source record update."
+
+  - name: stg_synthetic__orders
+    description: "Standardized staging view for synthetic orders with zero-division guards."
+    columns:
+      - name: order_id
+        description: "Natural canonical order identifier."
+        data_tests:
+          - unique
+          - not_null
+      - name: order_sk
+        description: "Strict SHA-256 surrogate key derived from order_id."
+        data_tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: "Foreign key referencing stg_synthetic__customers.customer_id."
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_synthetic__customers')
+              field: customer_id
+      - name: customer_sk
+        description: "Strict SHA-256 surrogate key referencing stg_synthetic__customers.customer_sk."
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_synthetic__customers')
+              field: customer_sk
+      - name: order_status
+        description: "Normalized uppercase order lifecycle status."
+        data_tests:
+          - accepted_values:
+              values: ["PAID", "PENDING", "CANCELLED"]
+      - name: gross_amount_usd
+        description: "Gross order value in USD."
+      - name: discount_usd
+        description: "Applied discount value in USD."
+      - name: net_amount_usd
+        description: "Net order value after discount in USD."
+      - name: discount_rate
+        description: "Discount ratio guarded against division by zero."
+      - name: order_date
+        description: "Calendar date when the order was placed."
+      - name: updated_at
+        description: "UTC timestamp of last order update."

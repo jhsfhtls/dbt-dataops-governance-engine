@@ -246,10 +246,10 @@
 
 | Macro | Category | Status | Supported Dialects | Signature | Description |
 | :--- | :--- | :---: | :--- | :--- | :--- |
-| `mask_lgpd_pii` | `LGPD_PRIVACY` | `PLANNED` | `duckdb`, `snowflake`, `spark`, `bigquery` | `mask_lgpd_pii(column_name, mode='default')` | Applies deterministic LGPD-compliant masking for CPF, CNPJ, email, and phone attributes across supported SQL adapters. |
-| `generate_surrogate_key_strict` | `MODELING_INTEGRITY` | `PLANNED` | `duckdb`, `snowflake`, `spark`, `bigquery` | `generate_surrogate_key_strict(field_list)` | Generates a deterministic SHA-256 surrogate key that preserves leading zeros and differentiates NULL values from empty strings. |
-| `incremental_watermark_filter` | `PERFORMANCE_FINOPS` | `PLANNED` | `duckdb`, `snowflake`, `spark`, `bigquery` | `incremental_watermark_filter(watermark_column, lookback_days=3)` | Emits a portable incremental lookback predicate guarded by is_incremental() to prevent full-table scans on large fact models. |
-| `audit_run_metadata` | `OBSERVABILITY_LINEAGE` | `PLANNED` | `duckdb`, `snowflake`, `spark`, `bigquery` | `audit_run_metadata()` | Injects standardized lineage and execution metadata columns (_dge_invocation_id, _dge_loaded_at_utc, _dge_model_name) into materialized tables. |
+| `mask_lgpd_pii` | `LGPD_PRIVACY` | `IMPLEMENTED` | `duckdb`, `snowflake`, `spark`, `bigquery` | `mask_lgpd_pii(column_name, mode='default')` | Applies deterministic LGPD-compliant masking for CPF, CNPJ, email, and phone attributes across supported SQL adapters. |
+| `generate_surrogate_key_strict` | `MODELING_INTEGRITY` | `IMPLEMENTED` | `duckdb`, `snowflake`, `spark`, `bigquery` | `generate_surrogate_key_strict(field_list)` | Generates a deterministic SHA-256 surrogate key that preserves leading zeros and differentiates NULL values from empty strings. |
+| `incremental_watermark_filter` | `PERFORMANCE_FINOPS` | `IMPLEMENTED` | `duckdb`, `snowflake`, `spark`, `bigquery` | `incremental_watermark_filter(watermark_column, lookback_days=3)` | Emits a portable incremental lookback predicate guarded by is_incremental() to prevent full-table scans on large fact models. |
+| `audit_run_metadata` | `OBSERVABILITY_LINEAGE` | `IMPLEMENTED` | `duckdb`, `snowflake`, `spark`, `bigquery` | `audit_run_metadata()` | Injects standardized lineage and execution metadata columns (_dge_invocation_id, _dge_loaded_at_utc, _dge_model_name) into materialized tables. |
 
 ---
 

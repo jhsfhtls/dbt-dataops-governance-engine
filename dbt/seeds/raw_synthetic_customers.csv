@@ -1,0 +1,6 @@
+customer_id,full_name,cpf,email,phone,postal_code,customer_segment,updated_at
+cust_001,Alice Synthetic,00011122233,user1@example.invalid,11999990001,01310100,ENTERPRISE,2026-11-20 10:00:00
+cust_002,Bruno Example,00022233344,user2@example.invalid,21988880002,20040002,SMB,2026-11-20 12:00:00
+cust_003,Carla Fixture,00033344455,user3@example.invalid,31977770003,04538132,ENTERPRISE,2026-11-21 09:30:00
+cust_004,Diego Demo,00044455566,user4@example.invalid,41966660004,80010000,N/A,2026-11-21 15:45:00
+cust_005,Elena Sample,00055566677,user5@example.invalid,51955550005,90010130,SMB,2026-11-22 08:15:00

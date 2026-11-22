@@ -1,0 +1,91 @@
+{
+  "target_path": "examples/legacy_sql_sample.sql",
+  "dialect": "duckdb",
+  "files_audited": 1,
+  "score": 50.0,
+  "grade": "F",
+  "finops_risk_level": "CRITICAL",
+  "lgpd_risk_level": "CRITICAL",
+  "total_findings": 6,
+  "counts_by_severity": {
+    "CRITICAL": 2,
+    "HIGH": 1,
+    "MEDIUM": 3,
+    "LOW": 0
+  },
+  "counts_by_family": {
+    "PERFORMANCE_FINOPS": 4,
+    "MODELING_MEDALLION": 0,
+    "QUALITY_CONTRACTS": 1,
+    "LGPD_PII_SECURITY": 1
+  },
+  "findings": [
+    {
+      "rule_id": "PERF_001",
+      "rule_name": "Disallow SELECT * in core and mart final models",
+      "family": "PERFORMANCE_FINOPS",
+      "severity": "HIGH",
+      "file_path": "examples/legacy_sql_sample.sql",
+      "line": 2,
+      "message": "Avoid SELECT * in core/mart or final models; enumerate explicit columns.",
+      "remediation": "Enumerate all required columns explicitly in the `SELECT` projection list and pair them with typed casts and documentation.",
+      "snippet": "*"
+    },
+    {
+      "rule_id": "PERF_007",
+      "rule_name": "Flag SELECT DISTINCT or UNION masking join fan-out and triggering shuffles",
+      "family": "PERFORMANCE_FINOPS",
+      "severity": "MEDIUM",
+      "file_path": "examples/legacy_sql_sample.sql",
+      "line": 2,
+      "message": "SELECT DISTINCT or UNION (without ALL) triggers full deduplication shuffles.",
+      "remediation": "Deduplicate upstream relations via `QUALIFY ROW_NUMBER() OVER (...) = 1`, fix join keys to avoid fan-out, and replace `UNION` with `UNION ALL` for disjoint branches.",
+      "snippet": ""
+    },
+    {
+      "rule_id": "QUAL_005",
+      "rule_name": "Require NULLIF zero-division protection on denominator expressions",
+      "family": "QUALITY_CONTRACTS",
+      "severity": "MEDIUM",
+      "file_path": "examples/legacy_sql_sample.sql",
+      "line": 4,
+      "message": "Unprotected division 'o.discount_usd / o.gross_amount_usd' lacks NULLIF(denominator, 0).",
+      "remediation": "Wrap dynamic denominator expressions with `NULLIF(denominator, 0)` (or `SAFE_DIVIDE` in BigQuery).",
+      "snippet": "o.discount_usd / o.gross_amount_usd"
+    },
+    {
+      "rule_id": "LGPD_001",
+      "rule_name": "Disallow unmasked PII columns without a masking or hashing macro",
+      "family": "LGPD_PII_SECURITY",
+      "severity": "CRITICAL",
+      "file_path": "examples/legacy_sql_sample.sql",
+      "line": 5,
+      "message": "Unmasked PII column(s) projected without masking macro: cpf, email.",
+      "remediation": "Wrap PII columns in a portable masking macro such as `{{ mask_lgpd_pii('email', mode='email') }}` or replace with a salted surrogate hash.",
+      "snippet": ""
+    },
+    {
+      "rule_id": "PERF_002",
+      "rule_name": "Disallow JOIN without predicate or implicit Cartesian cross join",
+      "family": "PERFORMANCE_FINOPS",
+      "severity": "CRITICAL",
+      "file_path": "examples/legacy_sql_sample.sql",
+      "line": 8,
+      "message": "CROSS JOIN detected; verify explicit join predicate or pre-aggregate.",
+      "remediation": "Add deterministic equality/range join predicates inside an explicit `ON` or `USING` clause, or pre-aggregate to a matching grain before joining.",
+      "snippet": "CROSS JOIN analytics_legacy.raw_customers AS c"
+    },
+    {
+      "rule_id": "PERF_004",
+      "rule_name": "Disallow non-sargable function calls on columns in WHERE or JOIN predicates",
+      "family": "PERFORMANCE_FINOPS",
+      "severity": "MEDIUM",
+      "file_path": "examples/legacy_sql_sample.sql",
+      "line": 9,
+      "message": "Non-sargable expression 'EXTRACT(YEAR FROM o.order_date)' wraps a column in a filter predicate.",
+      "remediation": "Rewrite predicates as range comparisons (`created_at >= '2026-01-01' AND created_at < '2027-01-01'`) or normalize the column once in staging.",
+      "snippet": "EXTRACT(YEAR FROM o.order_date) = 2026"
+    }
+  ],
+  "parse_errors": []
+}

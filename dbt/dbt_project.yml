@@ -1,0 +1,23 @@
+name: "dge_reference"
+version: "1.0.0"
+config-version: 2
+
+profile: "dge_reference"
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  dge_reference:
+    staging:
+      +materialized: view
+    core:
+      +materialized: table
+    marts:
+      +materialized: table

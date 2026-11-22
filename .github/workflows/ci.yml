@@ -72,5 +72,12 @@ jobs:
       - name: Verify Implementation Tracker sync (JORNADA_IMPLEMENTACAO.md)
         run: python scripts/render_progress.py --check
 
+      - name: Build reference dbt project & lint 100% docs coverage
+        run: |
+          mkdir -p dbt/target
+          dbt build --project-dir dbt --profiles-dir dbt
+          dbt docs generate --project-dir dbt --profiles-dir dbt
+          python scripts/lint_dbt_docs.py
+
       - name: Execute deterministic offline test suite
         run: pytest -m "not live" -v
