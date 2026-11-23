@@ -2,7 +2,7 @@
   "schema_version": "1.0.0",
   "last_updated": "2026-11-22",
   "project_name": "dbt-dataops-governance-engine",
-  "current_phase_id": "phase-06",
+  "current_phase_id": "phase-07",
   "overall_status": "ON_TRACK",
   "phases": [
     {
@@ -110,8 +110,8 @@
       "label": "Fase 07",
       "name": "Paridade nas 4 Interfaces (CLI, SDK, FastAPI, MCP)",
       "branch": "feat/phase-07-multi-interface-parity",
-      "status": "PENDING",
-      "completed_at": null,
+      "status": "COMPLETED",
+      "completed_at": "2026-11-22",
       "deliverables": [
         "CLI dge (audit, scaffold, transpile, lineage, rules)",
         "SDK DbtGovernance, FastAPI /api/v1/* e MCP dge-mcp (<untrusted_data>)",
@@ -176,6 +176,12 @@
       "phase": "Fase 06",
       "milestone": "Slim CI, SQLFluff & GitHub Pages (PR #7)",
       "summary": "Configuração de .sqlfluff (templater jinja), runner scripts/run_slim_ci.py com seleção seletiva state:modified+, workflow slim-ci.yml demonstrado em PR e workflow dbt-docs-pages.yml para publicação de linhagem no GitHub Pages."
+    },
+    {
+      "date": "2026-11-22",
+      "phase": "Fase 07",
+      "milestone": "Paridade nas 4 Interfaces (CLI, SDK, FastAPI, MCP) (PR #8)",
+      "summary": "Implementação da fachada DbtGovernance (SDK), CLI dge, API FastAPI /api/v1/*, servidor MCP dge-mcp (<untrusted_data>), extrator de linhagem Mermaid, quickstart <= 60s no README e suíte completa de testes de paridade."
     }
   ]
 }
